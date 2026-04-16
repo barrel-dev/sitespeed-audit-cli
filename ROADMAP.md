@@ -86,40 +86,89 @@ CREATE TABLE IF NOT EXISTS recommendations (
 
 ---
 
-## v0.4.0 — Web Dashboard
+## v0.4.0 — Web Dashboard (Catalyst)
 
-**Goal:** A local web dashboard to visualise and compare audit runs for any project without leaving the terminal workflow.
+**Goal:** Port every CLI operation to a full web dashboard — all the same power as the terminal commands, accessible through a polished UI with clickable buttons, dropdowns, filters, data tables, grouped cards, and interactive charts.
 
 ### Stack
-- **Server**: `fastify` — serves API + static files
-- **Frontend**: Vanilla JS + `Chart.js` — no build step, no bundler
-- **Launch**: `sitespeed dashboard [--port 3333] [--open]` — starts server, optionally opens browser
+- **UI framework**: [Catalyst](https://catalyst.tailwindui.com/) (Tailwind CSS + Headless UI component library) — gives a consistent, accessible design system out of the box
+- **Frontend**: React + Vite — fast dev builds, no config overhead
+- **Server**: `fastify` — REST API backed by the same SQLite queries as the CLI
+- **Charts**: `Chart.js` (or `Recharts`) — line, bar, and radar charts for metric visualisation
+- **Launch**: `sitespeed dashboard [--port 3333] [--open]` — starts the API server and serves the built frontend; optionally opens the browser
 
-### Dashboard views
+### CLI parity — every command gets a UI equivalent
 
-| View | Detail |
+| CLI command | Dashboard equivalent |
 |---|---|
-| **Overview** | Account → project tree; latest score badges per project |
-| **Run timeline** | Line chart of all 4 Lighthouse scores over time, filterable by label/device/tag |
-| **Metric deep-dive** | LCP, FCP, CLS, TBT, TTI, Speed Index charts side by side |
-| **Run compare** | Select any two audit IDs — renders a diff table with delta arrows and colour coding |
-| **Recommendations** | Surfaces saved AI recommendations; links back to the audit run |
-| **Export panel** | Download CSV / JSON directly from the browser |
+| `sitespeed init` | **New Project** modal — account/project/device dropdowns, base URL field |
+| `sitespeed audit <url>` | **Run Audit** panel — URL input, label/device/tags fields, platform toggle, password field; live progress indicator |
+| `sitespeed report` | **Audit History** table — sortable columns, label/device/tag filter dropdowns, pagination |
+| `sitespeed report --compare` | **Compare** view — select two runs from dropdowns; renders delta table with ↑↓ arrows and colour coding |
+| `sitespeed report --compare-tags` | **Tag Compare** — pick two tags from a dropdown; auto-fetches latest run per tag |
+| `sitespeed trend` | **Trend chart** — metric selector, label filter, interactive line chart over time |
+| `sitespeed export` | **Export panel** — JSON / CSV download buttons with optional label/device/tag filters |
+| `sitespeed cleanup` | **Cleanup** modal — date range picker, label filter, dry-run toggle, confirmation step |
+| `sitespeed projects` | **Projects sidebar** — account → project tree with audit count badges |
+| `sitespeed advise` | **AI Advisor** tab per run — surfaces recommendations with category grouping (v0.4 if v0.2 ships first) |
 
-### API routes (served by fastify)
+### Dashboard layout
+
 ```
-GET /api/accounts
-GET /api/projects?account_id=
-GET /api/audits?project_id=&label=&device=&tag=&limit=
-GET /api/audits/:id
-GET /api/trend?project_id=&label=&metric=
-GET /api/compare?a=:audit_id&b=:audit_id
-GET /api/recommendations?audit_id=
+┌─────────────────────────────────────────────────────────┐
+│  Sidebar                  │  Main content area           │
+│  ─────────────            │  ──────────────────────────  │
+│  Accounts                 │  [Breadcrumb: Acme / Blog]   │
+│   └ Acme Corp             │                              │
+│       ├ marketing-site ●  │  Filters: Label ▾  Device ▾ │
+│       └ blog              │           Tag ▾   Last N ▾  │
+│   └ Personal              │                              │
+│       └ portfolio         │  ┌──────────────────────┐   │
+│                           │  │ Score cards (4×)     │   │
+│  [+ New Project]          │  │ Perf  A11y  BP  SEO  │   │
+│  [▶ Run Audit]            │  └──────────────────────┘   │
+│                           │                              │
+│                           │  Trend chart (Chart.js)      │
+│                           │                              │
+│                           │  Audit history table         │
+│                           │  (sortable, paginated)       │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Key UI components (Catalyst)
+
+| Component | Used for |
+|---|---|
+| `Table` | Audit history, project listing, compare delta table |
+| `Select` / `Listbox` | Label, device, tag, metric dropdowns and filters |
+| `Dialog` / `Modal` | Run Audit, New Project, Cleanup confirmation |
+| `Badge` | Score colour coding (green / yellow / red), device labels |
+| `Card` | Per-metric summary cards on project overview |
+| `Button` | Run Audit, Export, Compare, Cleanup |
+| `Input` | URL field, password field, label/tag inputs |
+| `Tabs` | History / Trends / Compare / AI Advisor per project |
+| `Sparkline` / chart | Inline score trends in project cards |
+
+### API routes (fastify)
+
+```
+GET    /api/accounts
+GET    /api/projects?account_id=
+POST   /api/projects
+GET    /api/audits?project_id=&label=&device=&tag=&limit=&page=
+GET    /api/audits/:id
+POST   /api/audits                     ← triggers a new Lighthouse run
+DELETE /api/audits?project_id=&before=&label=
+GET    /api/trend?project_id=&label=&metric=
+GET    /api/compare?a=:audit_id&b=:audit_id
+GET    /api/compare-tags?project_id=&tag_a=&tag_b=
+GET    /api/export?project_id=&format=json|csv
+GET    /api/recommendations?audit_id=
 ```
 
 ### Security
 - Binds to `127.0.0.1` only (no external exposure)
-- Optional `--token <secret>` flag for Bearer auth on API routes
+- Optional `--token <secret>` flag for Bearer auth on all API routes
 
 ---
 
