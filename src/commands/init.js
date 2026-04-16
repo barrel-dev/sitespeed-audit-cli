@@ -2,11 +2,12 @@
  * `sitespeed init` — interactive setup of .sitespeedrc.json.
  *
  * Flow:
- *  1. Account — pick existing or create new
- *  2. Project — pick existing (for selected account) or create new
+ *  1. DB path (default ~/.sitespeed/data.db)
+ *  2. Account — pick existing or create new
+ *  3. Project — pick existing (for selected account) or create new
  *     (base URL is optional — can be set later or overridden per audit)
- *  3. Default device
- *  4. Write .sitespeedrc.json  (DB always stored at .sitespeed/data.db in CWD)
+ *  4. Default device
+ *  5. Write .sitespeedrc.json
  */
 import inquirer from 'inquirer';
 const { Separator } = inquirer;
@@ -24,12 +25,21 @@ import {
 export async function initCommand() {
   console.log(chalk.bold.cyan('\n🚀  sitespeed init\n'));
 
-  // DB is always .sitespeed/data.db inside the current project directory
+  // ── Step 1: DB path ──────────────────────────────────────────────────────────
   const existingConfig = loadConfig();
-  const dbPath = existingConfig?.dbPath ?? DEFAULT_DB_PATH;
+
+  const { dbPath } = await inquirer.prompt([
+    {
+      type: 'input',
+      name: 'dbPath',
+      message: 'Database file path:',
+      default: existingConfig?.dbPath ?? DEFAULT_DB_PATH,
+    },
+  ]);
+
   openDb(resolveDbPath({ dbPath }));
 
-  // ── Step 1: Account ──────────────────────────────────────────────────────────
+  // ── Step 2: Account ──────────────────────────────────────────────────────────
   const allAccounts = getAllAccounts();
   let accountName;
 
@@ -127,7 +137,7 @@ export async function initCommand() {
 
   const project = createProject(account.id, projectName, baseUrl);
 
-  // ── Step 3: Default device ───────────────────────────────────────────────────
+  // ── Step 4: Default device ───────────────────────────────────────────────────
   const { device } = await inquirer.prompt([
     {
       type: 'list',
@@ -141,7 +151,7 @@ export async function initCommand() {
     },
   ]);
 
-  // ── Step 4: Write config ─────────────────────────────────────────────────────
+  // ── Step 5: Write config ─────────────────────────────────────────────────────
   const config = { account: accountName, project: projectName, device, dbPath };
   saveConfig(config);
 
@@ -149,6 +159,6 @@ export async function initCommand() {
   console.log(chalk.gray(`  Account  : ${accountName}`));
   console.log(chalk.gray(`  Project  : ${projectName}`));
   console.log(chalk.gray(`  Device   : ${device}`));
-  console.log(chalk.gray(`  DB path  : ${dbPath}  ${chalk.dim('(relative to project root)')}`));
+  console.log(chalk.gray(`  DB path  : ${dbPath}`));
   console.log(chalk.cyan('\nRun `sitespeed audit <url>` to run your first audit!\n'));
 }

@@ -11,10 +11,9 @@ Track performance regressions over time, compare before/after deploys, and expor
 | Requirement | Version |
 |-------------|---------|
 | Node.js | v18 or later |
-| Google Chrome | Latest stable (must be in your PATH or a standard install location) |
 | npm | v8 or later |
 
-> **Linux / CI note:** Chrome is required. For headless environments, ensure the package `google-chrome-stable` (or `chromium-browser`) is installed. The audit runner already passes `--no-sandbox` and `--disable-dev-shm-usage` for container compatibility.
+> **Chrome / Chromium:** No system Chrome is required. The CLI uses the Chromium bundled with Puppeteer automatically. On Linux/CI the runner passes `--no-sandbox` and `--disable-setuid-sandbox` for container compatibility.
 
 ---
 
@@ -88,17 +87,21 @@ The resulting `.sitespeedrc.json` looks like:
 
 ### `sitespeed audit [url]`
 
-Run a Lighthouse audit on one or more URLs.
+Run a Lighthouse audit on one or more URLs. If `[url]` is omitted you are prompted to enter one interactively.
 
 ```bash
-# Audit a specific URL
+# Desktop audit (default)
 sitespeed audit https://example.com
+
+# Mobile audit
+sitespeed audit https://example.com --device mobile --label mobile-homepage
+
+# Run both desktop and mobile in one shot
+sitespeed audit --urls-file urls.txt --label desktop-batch
+sitespeed audit --urls-file urls.txt --label mobile-batch --device mobile
 
 # Audit with a label and tags
 sitespeed audit https://example.com/checkout --label checkout --tags "sprint-42,post-deploy"
-
-# Audit on mobile
-sitespeed audit https://example.com --device mobile --label mobile-homepage
 
 # Audit multiple URLs from a file
 sitespeed audit --urls-file urls.txt --label batch-run
@@ -106,7 +109,10 @@ sitespeed audit --urls-file urls.txt --label batch-run
 # Save the full Lighthouse JSON report to the DB
 sitespeed audit https://example.com --save-raw
 
-# Interactive — prompts for path suffix on top of base_url
+# Shopify password-protected storefront
+sitespeed audit https://mystore.myshopify.com --platform shopify --password mysecret
+
+# Interactive — prompts for URL
 sitespeed audit
 ```
 
@@ -119,6 +125,12 @@ sitespeed audit
 | `--tags, -t <tags>` | Comma-separated tags | — |
 | `--save-raw` | Store full Lighthouse JSON in DB | off |
 | `--urls-file <path>` | Newline-delimited file of URLs to audit | — |
+| `--platform <platform>` | Platform type for authenticated audits (`shopify`) | — |
+| `--password <password>` | Password for platform-authenticated audits | — |
+
+> **Desktop vs Mobile:** Use `--device desktop` (default) or `--device mobile`. Mobile runs Lighthouse with a simulated throttled 4G connection and a mobile viewport. Run the same URL twice with different `--device` values and different `--label` values to compare both results side-by-side with `sitespeed report --compare`.
+
+> **Shopify storefronts:** When `--platform shopify` is used the CLI launches Chromium via Puppeteer, navigates to the password form (`form[action="/password"]`), enters the password, submits, then passes the authenticated browser session directly to Lighthouse — so all scores reflect the real storefront.
 
 **Example output:**
 
@@ -287,6 +299,43 @@ sitespeed export | jq 'map(select(.score_performance < 50))'
 |------|-------------|---------|
 | `--format, -f <format>` | `json` or `csv` | `json` |
 | `--output, -o <file>` | Write to file instead of stdout | — |
+
+---
+
+### `sitespeed cleanup`
+
+Delete audit runs for the current project. Supports dry-run mode and multiple filter options.
+
+```bash
+# Preview what would be deleted (dry-run)
+sitespeed cleanup --older-than 30 --dry-run
+
+# Delete runs older than 30 days (with confirmation prompt)
+sitespeed cleanup --older-than 30
+
+# Delete runs older than 30 days, skip confirmation
+sitespeed cleanup --older-than 30 --yes
+
+# Delete runs before a specific date
+sitespeed cleanup --before 2025-01-01
+
+# Delete runs with a specific label
+sitespeed cleanup --label staging
+
+# Delete ALL audit runs for the current project
+sitespeed cleanup --all --yes
+```
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| `--all` | Delete all audit runs for this project |
+| `--label <label>` | Delete only runs with this label |
+| `--older-than <days>` | Delete runs older than N days |
+| `--before <date>` | Delete runs before `YYYY-MM-DD` |
+| `--dry-run` | Show what would be deleted without touching the DB |
+| `-y, --yes` | Skip the confirmation prompt |
 
 ---
 

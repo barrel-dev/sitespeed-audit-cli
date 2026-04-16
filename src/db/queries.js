@@ -268,7 +268,51 @@ export function getAllAuditsForExport(projectId) {
     .all(projectId);
 }
 
+/**
+ * Count audit rows matching a filter (used by cleanup before confirming deletion).
+ *
+ * @param {{ projectId: number, label?: string, before?: string }} filter
+ * @returns {number}
+ */
+export function countAudits(filter) {
+  const db = getDb();
+  const { where, params } = buildFilterClause(filter);
+  return db.prepare(`SELECT COUNT(*) AS n FROM audits WHERE ${where}`).get(params).n;
+}
+
+/**
+ * Delete audit rows matching a filter.
+ *
+ * @param {{ projectId: number, label?: string, before?: string }} filter
+ * @returns {number} Number of rows deleted.
+ */
+export function deleteAudits(filter) {
+  const db = getDb();
+  const { where, params } = buildFilterClause(filter);
+  return db.prepare(`DELETE FROM audits WHERE ${where}`).run(params).changes;
+}
+
 // ─── Internal helpers ─────────────────────────────────────────────────────────
+
+/**
+ * Build a WHERE clause and params object from a filter used by cleanup queries.
+ * @param {{ projectId: number, label?: string, before?: string }} filter
+ */
+function buildFilterClause(filter) {
+  const conditions = ['project_id = @projectId'];
+  const params = { projectId: filter.projectId };
+
+  if (filter.label) {
+    conditions.push('label = @label');
+    params.label = filter.label;
+  }
+  if (filter.before) {
+    conditions.push('run_at < @before');
+    params.before = filter.before;
+  }
+
+  return { where: conditions.join(' AND '), params };
+}
 
 /**
  * Map a human-friendly metric name to the corresponding DB column name.

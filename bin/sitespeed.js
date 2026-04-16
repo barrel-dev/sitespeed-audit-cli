@@ -13,6 +13,7 @@ import { reportCommand } from '../src/commands/report.js';
 import { projectsCommand } from '../src/commands/projects.js';
 import { trendCommand } from '../src/commands/trend.js';
 import { exportCommand } from '../src/commands/export.js';
+import { cleanupCommand } from '../src/commands/cleanup.js';
 
 const program = new Command();
 
@@ -42,6 +43,8 @@ program
   .option('-t, --tags <tags>', 'Comma-separated tags stored with the audit (e.g. "sprint-42,post-deploy")')
   .option('--save-raw', 'Store the full Lighthouse JSON report in the database')
   .option('--urls-file <path>', 'Audit multiple URLs read from a newline-delimited text file')
+  .option('--platform <platform>', 'Platform type (e.g. shopify) for authenticated audits')
+  .option('--password <password>', 'Password for platform-authenticated audits')
   .action(auditCommand);
 
 // ─── sitespeed report ─────────────────────────────────────────────────────────
@@ -85,5 +88,17 @@ program
   .option('-f, --format <format>', 'Output format: json or csv', 'json')
   .option('-o, --output <file>', 'Write to a file instead of stdout')
   .action(exportCommand);
+
+// ─── sitespeed cleanup ────────────────────────────────────────────────────────
+program
+  .command('cleanup')
+  .description('Delete audit runs for the current project.')
+  .option('--all', 'Delete ALL audit runs for this project')
+  .option('-l, --label <label>', 'Delete only runs with this label')
+  .option('--older-than <days>', 'Delete runs older than N days')
+  .option('--before <date>', 'Delete runs before YYYY-MM-DD')
+  .option('--dry-run', 'Show what would be deleted without touching the DB')
+  .option('-y, --yes', 'Skip the confirmation prompt')
+  .action(cleanupCommand);
 
 program.parse(process.argv);
