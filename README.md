@@ -171,11 +171,18 @@ sitespeed report --device mobile
 # Filter by tag
 sitespeed report --tag post-deploy
 
-# Side-by-side comparison of first vs latest
+# Auto-grouped by device — shows 🖥 Desktop and 📱 Mobile sections
+# when both devices have runs under the same label
+sitespeed report --label homepage
+
+# Smart compare: Desktop vs Mobile when both exist; First vs Latest otherwise
 sitespeed report --compare --label homepage
 
+# Compare latest run of two tags side-by-side
+sitespeed report --compare-tags before,after
+
 # Export to JSON / CSV
-sitespeed report --json | jq '.[] | .score_performance'
+sitespeed report --json | jq '.[] | .Performance'
 sitespeed report --csv > audits.csv
 ```
 
@@ -185,21 +192,61 @@ sitespeed report --csv > audits.csv
 |------|-------------|---------|
 | `--last, -n <n>` | Show last N audits | `10` |
 | `--label, -l <label>` | Filter by label | — |
-| `--device, -d <device>` | Filter by device | — |
+| `--device, -d <device>` | Filter by device (`desktop`\|`mobile`) | — |
 | `--tag, -t <tag>` | Filter by tag | — |
-| `--compare` | Side-by-side first vs latest | off |
+| `--compare` | Smart compare: Desktop vs Mobile when both exist; otherwise First vs Latest | off |
+| `--compare-tags <tags>` | Compare latest run of two tags, e.g. `"before,after"` | — |
 | `--json` | Output as JSON | off |
 | `--csv` | Output as CSV | off |
 
-**Example compare output:**
+> **Auto device-grouping:** When you run `--label homepage` without `--device`, the CLI detects whether you have both desktop and mobile runs and automatically splits the output into two labelled sections. Add `--device desktop` to see only one device.
+
+> **Tag-based comparison:** Tag your audits with `--tags "before"` before a deploy and `--tags "after"` after. Then compare them with `--compare-tags before,after` to see an exact Δ for every metric.
+
+**Example: auto-grouped output**
+
+```
+🖥  Desktop — homepage  (marketing-site)
+
+┌────────────────────────┬────────────────────────┬──────────┬─────────┬──────┬────────┬───────┬────────┐
+│ Date                   │ URL                    │ Label    │ Device  │ Perf │ LCP    │ CLS   │ TBT    │
+├────────────────────────┼────────────────────────┼──────────┼─────────┼──────┼────────┼───────┼────────┤
+│ 1/15/2025, 2:34:01 PM  │ https://example.com    │ homepage │ desktop │ 92   │ 1.24s  │ 0.002 │ 120ms  │
+└────────────────────────┴────────────────────────┴──────────┴─────────┴──────┴────────┴───────┴────────┘
+
+📱 Mobile — homepage  (marketing-site)
+
+┌────────────────────────┬────────────────────────┬──────────┬────────┬──────┬────────┬───────┬────────┐
+│ Date                   │ URL                    │ Label    │ Device │ Perf │ LCP    │ CLS   │ TBT    │
+├────────────────────────┼────────────────────────┼──────────┼────────┼──────┼────────┼───────┼────────┤
+│ 1/15/2025, 2:35:44 PM  │ https://example.com    │ homepage │ mobile │ 68   │ 3.10s  │ 0.042 │ 510ms  │
+└────────────────────────┴────────────────────────┴──────────┴────────┴──────┴────────┴───────┴────────┘
+```
+
+**Example: `--compare` output (Desktop vs Mobile)**
 
 ```
 Comparison — marketing-site  label: homepage
 
 ┌────────────────────┬──────────────────────────┬──────────────────────────┬──────────────┐
-│ Metric             │ First audit              │ Latest audit             │ Δ Change     │
+│ Metric             │ 🖥  Desktop               │ 📱 Mobile                │ Δ Change     │
 ├────────────────────┼──────────────────────────┼──────────────────────────┼──────────────┤
-│ Run at             │ 1/10/2025, 10:00:00 AM   │ 1/15/2025, 2:34:01 PM   │              │
+│ Run At             │ 1/15/2025, 2:34:01 PM    │ 1/15/2025, 2:35:44 PM   │              │
+│ Performance        │ 92                       │ 68                       │ -24          │
+│ LCP                │ 1.24s                    │ 3.10s                    │ +1860ms      │
+│ CLS                │ 0.002                    │ 0.042                    │ +0.040       │
+└────────────────────┴──────────────────────────┴──────────────────────────┴──────────────┘
+```
+
+**Example: `--compare-tags` output**
+
+```
+Comparison — marketing-site  tags: before → after
+
+┌────────────────────┬──────────────────────────┬──────────────────────────┬──────────────┐
+│ Metric             │ before                   │ after                    │ Δ Change     │
+├────────────────────┼──────────────────────────┼──────────────────────────┼──────────────┤
+│ Run At             │ 1/10/2025, 10:00:00 AM   │ 1/15/2025, 2:34:01 PM   │              │
 │ Performance        │ 45                       │ 92                       │ +47          │
 │ LCP                │ 4.50s                    │ 1.24s                    │ -3260ms      │
 │ CLS                │ 0.214                    │ 0.002                    │ -0.212       │

@@ -1,13 +1,18 @@
 # Sitespeed Audit CLI — Roadmap
 
-## Current: v0.1.0 — Core Audit Engine
+## ✅ v0.1.0 — Core Audit Engine _(shipped)_
 - [x] Lighthouse-based audits (LCP, FCP, FID, CLS, TTI, TBT, Speed Index + 4 scores)
 - [x] Multi-account / multi-project SQLite storage
 - [x] Labels, tags, device modes (desktop / mobile)
 - [x] `report` — tabular history with `--compare` (first vs last)
 - [x] `trend` — Unicode sparkline per metric over time
-- [x] `export` — JSON / CSV to stdout or file
+- [x] `export` — JSON / CSV to stdout or file (human-readable field names + formatted times)
 - [x] `projects` — cross-account project listing
+- [x] `cleanup` — delete runs by age, label, date, or all
+- [x] Shopify storefront auth (`--platform shopify --password`) with pre-flight pass/fail feedback
+- [x] Smart `report --compare` — Desktop vs Mobile when both exist; First vs Latest otherwise
+- [x] Auto device-grouped report sections (🖥 Desktop / 📱 Mobile) under the same label
+- [x] Tag-based comparison with `--compare-tags before,after`
 
 ---
 
