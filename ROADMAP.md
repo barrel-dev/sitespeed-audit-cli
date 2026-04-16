@@ -16,6 +16,82 @@
 
 ---
 
+## v0.1.5 — Static HTML Report _(immediate next)_
+
+**Goal:** Generate a self-contained, human-readable HTML file per project from all stored audit data — to validate the full dataset looks right and serves as a design preview for the v0.4.0 Catalyst dashboard before any frontend work begins.
+
+### Command
+
+```bash
+# Generate HTML report for the current project
+sitespeed html
+
+# Save to a specific file
+sitespeed html --output ./reports/marketing-site.html
+
+# Auto-open in the browser after generating
+sitespeed html --open
+```
+
+### Report structure
+
+The generated file is a single `.html` with inline CSS and no external dependencies (fully portable, email/Slack-friendly).
+
+#### Section 1 — All Runs
+A full audit history table, newest first, with colour-coded score badges per row. Columns mirror the terminal `report` output: Date, URL, Label, Device, Perf, A11y, Best Practices, SEO, LCP, CLS, TBT.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  All Runs  (47 total)                              [Filter: ▾]  │
+├──────────────────────┬──────────┬─────────┬───────┬──────┬──── │
+│ Date                 │ Label    │ Device  │ URL   │ Perf │ LCP  │
+├──────────────────────┼──────────┼─────────┼───────┼──────┼──── │
+│ Apr 16, 2026  2:34pm │ homepage │ desktop │ …     │  92  │ 1.2s │
+│ Apr 16, 2026  2:35pm │ homepage │ mobile  │ …     │  68  │ 3.1s │
+│ Apr 15, 2026 10:00am │ checkout │ desktop │ …     │  74  │ 2.4s │
+└──────────────────────┴──────────┴─────────┴───────┴──────┴──── │
+```
+
+#### Section 2 — Label Comparisons (Before / After)
+For every pair of labels that share the same URL, render a side-by-side delta table showing metric changes. Positive deltas highlighted green, negative red.
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  Label Comparison — before → after                           │
+├───────────────┬────────────────────┬────────────────────┬─── │
+│ Metric        │ before             │ after              │  Δ  │
+├───────────────┼────────────────────┼────────────────────┼─── │
+│ Performance   │ 45                 │ 92                 │ +47 │
+│ LCP           │ 4.50s              │ 1.24s              │ -3s │
+│ CLS           │ 0.214              │ 0.002              │ ✓   │
+└───────────────┴────────────────────┴────────────────────┴─── │
+```
+
+Pairs are auto-detected: any two labels that have runs on the same project are shown. Manual pairing also supported via `--compare-labels before,after`.
+
+#### Section 3 — Device Groups (Desktop vs Mobile)
+For every label that has both a desktop and mobile run, render a paired card showing both side by side with per-metric deltas. Makes it immediately obvious where the mobile performance gap is.
+
+```
+┌────────────────────────────────────────────────────────────┐
+│  homepage                                                  │
+│  ─────────────────────────────────────────────────────     │
+│  🖥 Desktop                    📱 Mobile                   │
+│  Perf:  92  LCP: 1.24s        Perf:  68  LCP: 3.10s       │
+│  CLS:  0.002  TBT: 120ms      CLS:  0.042  TBT: 510ms     │
+│                                                            │
+│  Δ Performance: -24   Δ LCP: +1.86s   Δ CLS: +0.040       │
+└────────────────────────────────────────────────────────────┘
+```
+
+### Implementation notes
+- Output is a **single self-contained `.html`** file — inline CSS, no JS frameworks, no external requests
+- Score badges use the same green / yellow / red thresholds as the terminal (≥90 / 50–89 / <50)
+- Sections are collapsible via `<details>` / `<summary>` for long projects
+- Serves as a **design contract** for the v0.4.0 Catalyst dashboard — every section here maps 1:1 to a dashboard view
+
+---
+
 ## v0.2.0 — AI Fix Advisor _(next)_
 
 **Goal:** After every audit, surface actionable, AI-generated fix recommendations keyed to the actual Lighthouse findings for that run.
