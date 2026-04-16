@@ -2,19 +2,17 @@
  * `sitespeed init` — interactive setup of .sitespeedrc.json.
  *
  * Flow:
- *  1. DB path (default ~/.sitespeed/data.db)
- *  2. Account — pick existing or create new
- *  3. Project — pick existing (for selected account) or create new (name + base URL)
- *  4. Default device
- *  5. Write .sitespeedrc.json
+ *  1. Account — pick existing or create new
+ *  2. Project — pick existing (for selected account) or create new
+ *     (base URL is optional — can be set later or overridden per audit)
+ *  3. Default device
+ *  4. Write .sitespeedrc.json  (DB always stored at .sitespeed/data.db in CWD)
  */
 import inquirer from 'inquirer';
 const { Separator } = inquirer;
 import chalk from 'chalk';
-import { homedir } from 'os';
-import { join } from 'path';
 
-import { loadConfig, saveConfig, resolveDbPath } from '../config.js';
+import { loadConfig, saveConfig, resolveDbPath, DEFAULT_DB_PATH } from '../config.js';
 import { openDb } from '../db/index.js';
 import {
   createAccount,
@@ -26,22 +24,12 @@ import {
 export async function initCommand() {
   console.log(chalk.bold.cyan('\n🚀  sitespeed init\n'));
 
-  // ── Step 1: DB path ──────────────────────────────────────────────────────────
+  // DB is always .sitespeed/data.db inside the current project directory
   const existingConfig = loadConfig();
-  const defaultDbPath = existingConfig?.dbPath ?? join(homedir(), '.sitespeed', 'data.db');
-
-  const { dbPath } = await inquirer.prompt([
-    {
-      type: 'input',
-      name: 'dbPath',
-      message: 'Database file path:',
-      default: defaultDbPath,
-    },
-  ]);
-
+  const dbPath = existingConfig?.dbPath ?? DEFAULT_DB_PATH;
   openDb(resolveDbPath({ dbPath }));
 
-  // ── Step 2: Account ──────────────────────────────────────────────────────────
+  // ── Step 1: Account ──────────────────────────────────────────────────────────
   const allAccounts = getAllAccounts();
   let accountName;
 
@@ -100,22 +88,9 @@ export async function initCommand() {
         message: 'No projects yet. Enter a name for your first project:',
         validate: (v) => v.trim() !== '' || 'Project name cannot be empty.',
       },
-      {
-        type: 'input',
-        name: 'baseUrl',
-        message: 'Base URL for the project (e.g. https://example.com):',
-        validate: (v) => {
-          try {
-            new URL(v);
-            return true;
-          } catch {
-            return 'Please enter a valid URL including the scheme (https://).';
-          }
-        },
-      },
     ]);
     projectName = answers.name.trim();
-    baseUrl = answers.baseUrl.trim();
+    baseUrl = null;
   } else {
     const { choice } = await inquirer.prompt([
       {
@@ -124,7 +99,7 @@ export async function initCommand() {
         message: 'Select a project:',
         choices: [
           ...existingProjects.map((p) => ({
-            name: `${p.name}  ${chalk.gray(p.base_url)}`,
+            name: p.base_url ? `${p.name}  ${chalk.gray(p.base_url)}` : p.name,
             value: p.name,
           })),
           new Separator(),
@@ -141,31 +116,18 @@ export async function initCommand() {
           message: 'New project name:',
           validate: (v) => v.trim() !== '' || 'Project name cannot be empty.',
         },
-        {
-          type: 'input',
-          name: 'baseUrl',
-          message: 'Base URL (e.g. https://example.com):',
-          validate: (v) => {
-            try {
-              new URL(v);
-              return true;
-            } catch {
-              return 'Please enter a valid URL including the scheme (https://).';
-            }
-          },
-        },
       ]);
       projectName = answers.name.trim();
-      baseUrl = answers.baseUrl.trim();
+      baseUrl = null;
     } else {
       projectName = choice;
-      baseUrl = existingProjects.find((p) => p.name === choice)?.base_url ?? '';
+      baseUrl = existingProjects.find((p) => p.name === choice)?.base_url ?? null;
     }
   }
 
   const project = createProject(account.id, projectName, baseUrl);
 
-  // ── Step 4: Default device ───────────────────────────────────────────────────
+  // ── Step 3: Default device ───────────────────────────────────────────────────
   const { device } = await inquirer.prompt([
     {
       type: 'list',
@@ -179,15 +141,14 @@ export async function initCommand() {
     },
   ]);
 
-  // ── Step 5: Write config ─────────────────────────────────────────────────────
+  // ── Step 4: Write config ─────────────────────────────────────────────────────
   const config = { account: accountName, project: projectName, device, dbPath };
   saveConfig(config);
 
   console.log(chalk.green('\n✓ Configuration written to .sitespeedrc.json'));
   console.log(chalk.gray(`  Account  : ${accountName}`));
   console.log(chalk.gray(`  Project  : ${projectName}`));
-  console.log(chalk.gray(`  Base URL : ${project.base_url}`));
   console.log(chalk.gray(`  Device   : ${device}`));
-  console.log(chalk.gray(`  DB path  : ${dbPath}`));
-  console.log(chalk.cyan('\nRun `sitespeed audit` to run your first audit!\n'));
+  console.log(chalk.gray(`  DB path  : ${dbPath}  ${chalk.dim('(relative to project root)')}`));
+  console.log(chalk.cyan('\nRun `sitespeed audit <url>` to run your first audit!\n'));
 }

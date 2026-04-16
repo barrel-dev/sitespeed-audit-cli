@@ -2,11 +2,12 @@
  * Config helpers for reading/writing .sitespeedrc.json in the current directory.
  */
 import { readFileSync, writeFileSync, existsSync } from 'fs';
-import { join } from 'path';
+import { join, isAbsolute } from 'path';
 import { homedir } from 'os';
 
 const CONFIG_FILENAME = '.sitespeedrc.json';
-export const DEFAULT_DB_PATH = join(homedir(), '.sitespeed', 'data.db');
+// Default: inside the project directory, not the user's home
+export const DEFAULT_DB_PATH = '.sitespeed/data.db';
 
 /**
  * Load .sitespeedrc.json from cwd.
@@ -40,7 +41,10 @@ export function saveConfig(config) {
  */
 export function resolveDbPath(config) {
   const raw = config?.dbPath ?? DEFAULT_DB_PATH;
-  return raw.startsWith('~') ? raw.replace(/^~/, homedir()) : raw;
+  // Expand ~ to home dir
+  const expanded = raw.startsWith('~') ? raw.replace(/^~/, homedir()) : raw;
+  // Resolve relative paths from CWD (so .sitespeed/data.db lands inside the project)
+  return isAbsolute(expanded) ? expanded : join(process.cwd(), expanded);
 }
 
 /**

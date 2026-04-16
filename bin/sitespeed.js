@@ -35,8 +35,7 @@ program
   .command('audit [url]')
   .description(
     'Run a Lighthouse audit.\n' +
-      'If [url] is omitted the base_url from .sitespeedrc.json is used and you are\n' +
-      'prompted for a path suffix.',
+      'If [url] is omitted you will be prompted to enter the full URL to audit.',
   )
   .option('-l, --label <label>', 'Tag this run (e.g. "homepage", "checkout")')
   .option('-d, --device <device>', 'Override device — desktop or mobile', 'desktop')

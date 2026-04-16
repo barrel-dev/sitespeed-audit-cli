@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS projects (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   account_id INTEGER NOT NULL REFERENCES accounts(id),
   name TEXT NOT NULL,
-  base_url TEXT NOT NULL,
+  base_url TEXT,
   created_at TEXT DEFAULT (datetime('now')),
   UNIQUE(account_id, name)
 );

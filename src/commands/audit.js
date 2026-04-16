@@ -75,27 +75,23 @@ export async function auditCommand(urlArg, options) {
   } else if (urlArg) {
     urls = [urlArg];
   } else {
-    // Interactive — prompt for a path suffix appended to base_url
-    const base = project.base_url.replace(/\/$/, '');
-    const { pathSuffix } = await inquirer.prompt([
+    // Interactive — prompt for a full URL
+    const { fullUrl } = await inquirer.prompt([
       {
         type: 'input',
-        name: 'pathSuffix',
-        message: `URL path to audit ${chalk.gray(`(base: ${base})`)}:`,
-        default: '/',
+        name: 'fullUrl',
+        message: 'URL to audit:',
         validate: (v) => {
-          const full = base + (v.startsWith('/') ? v : '/' + v);
           try {
-            new URL(full);
+            new URL(v.trim());
             return true;
           } catch {
-            return 'Invalid path — result must be a valid URL.';
+            return 'Please enter a valid URL including the scheme (https://).';
           }
         },
       },
     ]);
-    const suffix = pathSuffix.startsWith('/') ? pathSuffix : '/' + pathSuffix;
-    urls = [base + suffix];
+    urls = [fullUrl.trim()];
   }
 
   // ── Audit each URL ───────────────────────────────────────────────────────────

@@ -1,6 +1,7 @@
 node_modules/
 
-# SQLite database files
+# SQLite database and WAL files (stored inside project at .sitespeed/)
+.sitespeed/
 *.db
 *.db-shm
 *.db-wal

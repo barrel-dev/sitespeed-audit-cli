@@ -5,6 +5,7 @@
  */
 import { launch } from 'chrome-launcher';
 import lighthouse from 'lighthouse';
+import { executablePath } from 'puppeteer';
 
 // ─── Desktop config ────────────────────────────────────────────────────────────
 // Mimics the preset Lighthouse uses for desktop audits (high bandwidth, no throttling).
@@ -50,10 +51,12 @@ export async function runAudit(url, { device = 'desktop', saveRaw = false } = {}
 
   try {
     chrome = await launch({
+      chromePath: executablePath(),
       chromeFlags: [
         '--headless',
         '--disable-gpu',
         '--no-sandbox',
+        '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
       ],
     });
