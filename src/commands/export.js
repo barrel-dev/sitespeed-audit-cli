@@ -35,15 +35,17 @@ export async function exportCommand(options) {
     process.exit(1);
   }
 
-  // ── Fetch all audits ─────────────────────────────────────────────────────────
-  const audits = getAllAuditsForExport(project.id);
+  // ── Fetch and humanize ───────────────────────────────────────────────────────
+  const raw = getAllAuditsForExport(project.id);
 
-  if (audits.length === 0) {
+  if (raw.length === 0) {
     console.log(chalk.yellow('\nNo audits to export for this project.\n'));
     return;
   }
 
-  // ── Format output ─────────────────────────────────────────────────────────────
+  const audits = raw.map(humanize);
+
+  // ── Format output ────────────────────────────────────────────────────────────
   const content = format === 'csv' ? toCSV(audits) : JSON.stringify(audits, null, 2);
 
   // ── Write or print ────────────────────────────────────────────────────────────
@@ -57,17 +59,66 @@ export async function exportCommand(options) {
   }
 }
 
+// ─── Humanize ─────────────────────────────────────────────────────────────────
+
+/**
+ * Transform a raw DB audit row into a human-readable object.
+ * - Underscore field names → Title Case labels
+ * - Timing values (ms) → "1.24s" / "120ms"
+ * - CLS → 3 decimal places
+ * - run_at ISO string → locale date string
+ * - Tags JSON array string → comma-separated string
+ */
+function humanize(row) {
+  return {
+    'ID':               row.id,
+    'URL':              row.url,
+    'Label':            row.label ?? '',
+    'Device':           row.device,
+    'Run At':           row.run_at ? new Date(row.run_at).toLocaleString() : '',
+    'Performance':      row.score_performance ?? '',
+    'Accessibility':    row.score_accessibility ?? '',
+    'Best Practices':   row.score_best_practices ?? '',
+    'SEO':              row.score_seo ?? '',
+    'LCP':              fmtMs(row.metric_lcp),
+    'FCP':              fmtMs(row.metric_fcp),
+    'FID (Max)':        fmtMs(row.metric_fid),
+    'CLS':              fmtCls(row.metric_cls),
+    'TTI':              fmtMs(row.metric_tti),
+    'TBT':              fmtMs(row.metric_tbt),
+    'Speed Index':      fmtMs(row.metric_speed_index),
+    'Tags':             fmtTags(row.tags),
+  };
+}
+
+function fmtMs(ms) {
+  if (ms === null || ms === undefined) return '';
+  if (ms >= 1000) return `${(ms / 1000).toFixed(2)}s`;
+  return `${Math.round(ms)}ms`;
+}
+
+function fmtCls(v) {
+  if (v === null || v === undefined) return '';
+  return Number(v).toFixed(3);
+}
+
+function fmtTags(tags) {
+  if (!tags) return '';
+  try {
+    const arr = JSON.parse(tags);
+    return Array.isArray(arr) ? arr.join(', ') : tags;
+  } catch {
+    return tags;
+  }
+}
+
 // ─── CSV helpers ──────────────────────────────────────────────────────────────
 
-const CSV_HEADERS = [
-  'id', 'url', 'label', 'device', 'run_at',
-  'score_performance', 'score_accessibility', 'score_best_practices', 'score_seo',
-  'metric_lcp', 'metric_fid', 'metric_cls', 'metric_fcp',
-  'metric_tti', 'metric_tbt', 'metric_speed_index',
-  'tags',
-];
-
 function toCSV(audits) {
+  if (audits.length === 0) return '';
+
+  const headers = Object.keys(audits[0]);
+
   const escape = (v) => {
     if (v === null || v === undefined) return '';
     const s = String(v);
@@ -78,8 +129,8 @@ function toCSV(audits) {
   };
 
   const rows = [
-    CSV_HEADERS.join(','),
-    ...audits.map((a) => CSV_HEADERS.map((h) => escape(a[h])).join(',')),
+    headers.join(','),
+    ...audits.map((a) => headers.map((h) => escape(a[h])).join(',')),
   ];
 
   return rows.join('\n');
