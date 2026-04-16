@@ -21,4 +21,6 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
-C:\\Users\\
+# Lighthouse / Chrome temp profile dirs (created in CWD on some systems)
+C:\Users\
+lighthouse.*/
