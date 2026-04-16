@@ -46,6 +46,8 @@ export async function auditCommand(urlArg, options) {
   const device = options.device ?? config.device ?? 'desktop';
   const saveRaw = options.saveRaw ?? false;
   const label = options.label ?? null;
+  const platform = options.platform ?? null;
+  const password = options.password ?? null;
   const tags = options.tags
     ? options.tags
         .split(',')
@@ -94,6 +96,28 @@ export async function auditCommand(urlArg, options) {
     urls = [fullUrl.trim()];
   }
 
+  // ── Shopify auth pre-flight ──────────────────────────────────────────────────
+  if (platform === 'shopify') {
+    if (!password) {
+      console.error(chalk.red('--platform shopify requires --password <pass>'));
+      process.exit(1);
+    }
+    const authSpinner = ora({
+      text: 'Authenticating with Shopify password gate…',
+      prefixText: chalk.gray('[auth]'),
+    }).start();
+    try {
+      // Probe auth on the first URL — reuses the same session cookie Puppeteer sets
+      // before Lighthouse runs, so we only need to test it once.
+      const { runShopifyAuthCheck } = await import('../lighthouse/runner.js');
+      await runShopifyAuthCheck(urls[0], password);
+      authSpinner.succeed(chalk.green('Shopify authentication succeeded.'));
+    } catch (err) {
+      authSpinner.fail(chalk.red(`Shopify authentication failed: ${err.message}`));
+      process.exit(1);
+    }
+  }
+
   // ── Audit each URL ───────────────────────────────────────────────────────────
   console.log(
     chalk.bold(`\nAuditing ${urls.length} URL${urls.length > 1 ? 's' : ''} ` +
@@ -109,7 +133,7 @@ export async function auditCommand(urlArg, options) {
     }).start();
 
     try {
-      const result = await runAudit(url, { device, saveRaw });
+      const result = await runAudit(url, { device, saveRaw, platform, password });
 
       spinner.succeed(
         `${chalk.white(url)}\n` +

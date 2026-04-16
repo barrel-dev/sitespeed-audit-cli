@@ -126,6 +126,45 @@ export async function runAudit(url, { device = 'desktop', saveRaw = false, platf
 // ─── Shopify password-protected storefront ────────────────────────────────────
 
 /**
+ * Verify that a Shopify storefront password is valid by navigating the password
+ * gate and checking whether we land on the store. Throws if auth fails.
+ * Does NOT run a Lighthouse audit — used as a pre-flight check.
+ *
+ * @param {string} url
+ * @param {string} password
+ */
+export async function runShopifyAuthCheck(url, password) {
+  const browser = await puppeteer.launch({
+    executablePath: executablePath(),
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
+  });
+  try {
+    const page = await browser.newPage();
+    await page.goto(url, { waitUntil: 'networkidle2', timeout: 30_000 });
+
+    const passwordForm = await page.$('form[action="/password"]');
+    if (!passwordForm) {
+      // Store is already accessible — no gate to pass
+      return;
+    }
+
+    await page.type('form[action="/password"] input[type="password"]', password);
+    await Promise.all([
+      page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30_000 }),
+      page.click('form[action="/password"] button[type="submit"]'),
+    ]);
+
+    const stillLocked = await page.$('form[action="/password"]');
+    if (stillLocked) {
+      throw new Error('Incorrect password — still on the password page.');
+    }
+  } finally {
+    await browser.close();
+  }
+}
+
+/**
  * Authenticate through a Shopify storefront password page, then run Lighthouse
  * using the same Chrome session so the audit sees the unlocked store.
  *
@@ -157,23 +196,19 @@ async function runAuditWithShopifyAuth(url, { device, saveRaw, password }) {
     const page = await browser.newPage();
     await page.goto(url, { waitUntil: 'networkidle2', timeout: 30_000 });
 
-    // Detect the Shopify password gate
+    // Auth is already validated by runShopifyAuthCheck pre-flight.
+    // Still handle the gate here in case runAudit is called directly.
     const passwordForm = await page.$('form[action="/password"]');
     if (passwordForm) {
-      // Fill the password field and submit
       await page.type('form[action="/password"] input[type="password"]', password);
       await Promise.all([
         page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30_000 }),
         page.click('form[action="/password"] button[type="submit"]'),
       ]);
 
-      // Verify we made it past the gate
       const stillLocked = await page.$('form[action="/password"]');
       if (stillLocked) {
-        throw new Error(
-          'Shopify password authentication failed — still on the password page. ' +
-            'Check that the password is correct.',
-        );
+        throw new Error('Shopify authentication failed — incorrect password.');
       }
     }
 
