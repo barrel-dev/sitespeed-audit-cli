@@ -53,18 +53,19 @@ export function createAuditTable(audits) {
 // ─── Compare table ────────────────────────────────────────────────────────────
 
 /**
- * Render a side-by-side first-vs-last comparison table.
+ * Render a side-by-side comparison table for two audit rows.
  *
- * @param {object} first  First matching audit row.
- * @param {object} last   Latest matching audit row.
+ * @param {object} a        Left-hand audit row.
+ * @param {object} b        Right-hand audit row.
+ * @param {{ colA?: string, colB?: string }} [labels]  Column header overrides.
  * @returns {string}
  */
-export function createCompareTable(first, last) {
+export function createCompareTable(a, b, { colA = 'First audit', colB = 'Latest audit' } = {}) {
   const table = new Table({
     head: [
       chalk.bold('Metric'),
-      chalk.bold('First audit'),
-      chalk.bold('Latest audit'),
+      chalk.bold(colA),
+      chalk.bold(colB),
       chalk.bold('Δ Change'),
     ],
     style: { head: [], border: [] },
@@ -73,71 +74,71 @@ export function createCompareTable(first, last) {
   });
 
   table.push(
-    ['Run at', fmtDate(first.run_at), fmtDate(last.run_at), ''],
-    ['URL', truncate(first.url, 22), truncate(last.url, 22), ''],
-    ['Label', first.label ?? chalk.gray('—'), last.label ?? chalk.gray('—'), ''],
-    ['Device', first.device ?? 'desktop', last.device ?? 'desktop', ''],
+    ['Run at', fmtDate(a.run_at), fmtDate(b.run_at), ''],
+    ['URL', truncate(a.url, 22), truncate(b.url, 22), ''],
+    ['Label', a.label ?? chalk.gray('—'), b.label ?? chalk.gray('—'), ''],
+    ['Device', a.device ?? 'desktop', b.device ?? 'desktop', ''],
     ['', '', '', ''],
     [
       'Performance',
-      colorScore(first.score_performance),
-      colorScore(last.score_performance),
-      deltaScore(first.score_performance, last.score_performance),
+      colorScore(a.score_performance),
+      colorScore(b.score_performance),
+      deltaScore(a.score_performance, b.score_performance),
     ],
     [
       'Accessibility',
-      colorScore(first.score_accessibility),
-      colorScore(last.score_accessibility),
-      deltaScore(first.score_accessibility, last.score_accessibility),
+      colorScore(a.score_accessibility),
+      colorScore(b.score_accessibility),
+      deltaScore(a.score_accessibility, b.score_accessibility),
     ],
     [
       'Best Practices',
-      colorScore(first.score_best_practices),
-      colorScore(last.score_best_practices),
-      deltaScore(first.score_best_practices, last.score_best_practices),
+      colorScore(a.score_best_practices),
+      colorScore(b.score_best_practices),
+      deltaScore(a.score_best_practices, b.score_best_practices),
     ],
     [
       'SEO',
-      colorScore(first.score_seo),
-      colorScore(last.score_seo),
-      deltaScore(first.score_seo, last.score_seo),
+      colorScore(a.score_seo),
+      colorScore(b.score_seo),
+      deltaScore(a.score_seo, b.score_seo),
     ],
     ['', '', '', ''],
     [
       'LCP',
-      formatMs(first.metric_lcp),
-      formatMs(last.metric_lcp),
-      deltaMs(first.metric_lcp, last.metric_lcp, /* lowerIsBetter */ true),
+      formatMs(a.metric_lcp),
+      formatMs(b.metric_lcp),
+      deltaMs(a.metric_lcp, b.metric_lcp, /* lowerIsBetter */ true),
     ],
     [
       'FCP',
-      formatMs(first.metric_fcp),
-      formatMs(last.metric_fcp),
-      deltaMs(first.metric_fcp, last.metric_fcp, true),
+      formatMs(a.metric_fcp),
+      formatMs(b.metric_fcp),
+      deltaMs(a.metric_fcp, b.metric_fcp, true),
     ],
     [
       'TBT',
-      formatMs(first.metric_tbt),
-      formatMs(last.metric_tbt),
-      deltaMs(first.metric_tbt, last.metric_tbt, true),
+      formatMs(a.metric_tbt),
+      formatMs(b.metric_tbt),
+      deltaMs(a.metric_tbt, b.metric_tbt, true),
     ],
     [
       'TTI',
-      formatMs(first.metric_tti),
-      formatMs(last.metric_tti),
-      deltaMs(first.metric_tti, last.metric_tti, true),
+      formatMs(a.metric_tti),
+      formatMs(b.metric_tti),
+      deltaMs(a.metric_tti, b.metric_tti, true),
     ],
     [
       'CLS',
-      formatCls(first.metric_cls),
-      formatCls(last.metric_cls),
-      deltaCls(first.metric_cls, last.metric_cls),
+      formatCls(a.metric_cls),
+      formatCls(b.metric_cls),
+      deltaCls(a.metric_cls, b.metric_cls),
     ],
     [
       'Speed Index',
-      formatMs(first.metric_speed_index),
-      formatMs(last.metric_speed_index),
-      deltaMs(first.metric_speed_index, last.metric_speed_index, true),
+      formatMs(a.metric_speed_index),
+      formatMs(b.metric_speed_index),
+      deltaMs(a.metric_speed_index, b.metric_speed_index, true),
     ],
   );
 

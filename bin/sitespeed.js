@@ -55,7 +55,8 @@ program
   .option('-l, --label <label>', 'Filter by label')
   .option('-d, --device <device>', 'Filter by device (desktop|mobile)')
   .option('-t, --tag <tag>', 'Filter by tag')
-  .option('--compare', 'Side-by-side comparison of the first and latest matching audits')
+  .option('--compare', 'Smart comparison: Desktop vs Mobile when label has both; otherwise First vs Latest')
+  .option('--compare-tags <tags>', 'Compare latest run of two tags, e.g. "before,after"')
   .option('--json', 'Output as JSON (suitable for piping)')
   .option('--csv', 'Output as CSV')
   .action(reportCommand);

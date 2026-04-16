@@ -269,6 +269,52 @@ export function getAllAuditsForExport(projectId) {
 }
 
 /**
+ * Return the distinct devices that have audit runs for a given label.
+ * Used to detect when a label has both desktop and mobile runs.
+ *
+ * @param {number} projectId
+ * @param {string} label
+ * @returns {string[]}  e.g. ['desktop', 'mobile']
+ */
+export function getDistinctDevicesForLabel(projectId, label) {
+  const rows = getDb()
+    .prepare(
+      `SELECT DISTINCT device FROM audits
+       WHERE project_id = ? AND label = ?
+       ORDER BY device`,
+    )
+    .all(projectId, label);
+  return rows.map((r) => r.device);
+}
+
+/**
+ * Return the latest audit row that includes a given tag value.
+ * Tags are stored as a JSON array string, so filtering happens in JS.
+ *
+ * @param {number} projectId
+ * @param {string} tag
+ * @returns {object|null}
+ */
+export function getLatestAuditByTag(projectId, tag) {
+  const rows = getDb()
+    .prepare(
+      `SELECT * FROM audits
+       WHERE project_id = ? AND tags IS NOT NULL
+       ORDER BY run_at DESC`,
+    )
+    .all(projectId);
+
+  const match = rows.find((row) => {
+    try {
+      return JSON.parse(row.tags).includes(tag);
+    } catch {
+      return false;
+    }
+  });
+  return match ?? null;
+}
+
+/**
  * Count audit rows matching a filter (used by cleanup before confirming deletion).
  *
  * @param {{ projectId: number, label?: string, before?: string }} filter

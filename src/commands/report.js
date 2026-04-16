@@ -2,19 +2,29 @@
  * `sitespeed report` — display audit history for the current project.
  *
  * Options:
- *   --last <n>          Show last N audits (default: 10)
- *   --label <label>     Filter by label
- *   --device <d>        Filter by device
- *   --tag <tag>         Filter by tag
- *   --compare           Side-by-side first vs latest comparison
- *   --json              Output raw JSON to stdout
- *   --csv               Output CSV to stdout
+ *   --last <n>              Show last N audits (default: 10)
+ *   --label <label>         Filter by label
+ *   --device <d>            Filter by device
+ *   --tag <tag>             Filter by tag
+ *   --compare               Smart comparison:
+ *                             - label with both devices → Desktop vs Mobile
+ *                             - otherwise → First vs Latest
+ *   --compare-tags <t1,t2>  Compare latest run of tag t1 vs latest run of tag t2
+ *   --json                  Output raw JSON to stdout
+ *   --csv                   Output CSV to stdout
  */
 import chalk from 'chalk';
 
 import { requireConfig, resolveDbPath } from '../config.js';
 import { openDb } from '../db/index.js';
-import { getAccountByName, getProjectByName, getAudits, getFirstAndLastAudits } from '../db/queries.js';
+import {
+  getAccountByName,
+  getProjectByName,
+  getAudits,
+  getFirstAndLastAudits,
+  getDistinctDevicesForLabel,
+  getLatestAuditByTag,
+} from '../db/queries.js';
 import { createAuditTable, createCompareTable } from '../utils/table.js';
 
 export async function reportCommand(options) {
@@ -34,15 +44,67 @@ export async function reportCommand(options) {
     process.exit(1);
   }
 
-  const filters = {
-    last: parseInt(options.last ?? '10', 10),
-    label: options.label,
-    device: options.device,
-    tag: options.tag,
-  };
+  // ── --compare-tags <t1,t2> ────────────────────────────────────────────────────
+  if (options.compareTags) {
+    const parts = options.compareTags.split(',').map((t) => t.trim()).filter(Boolean);
+    if (parts.length !== 2) {
+      console.error(chalk.red('--compare-tags expects exactly two comma-separated tags, e.g. "before,after"'));
+      process.exit(1);
+    }
+    const [tagA, tagB] = parts;
+    const auditA = getLatestAuditByTag(project.id, tagA);
+    const auditB = getLatestAuditByTag(project.id, tagB);
 
-  // ── Compare mode ─────────────────────────────────────────────────────────────
+    if (!auditA) {
+      console.log(chalk.yellow(`\nNo audits found with tag "${tagA}".\n`));
+      return;
+    }
+    if (!auditB) {
+      console.log(chalk.yellow(`\nNo audits found with tag "${tagB}".\n`));
+      return;
+    }
+
+    console.log(
+      `\n${chalk.bold('Tag comparison')} — ${chalk.cyan(config.project)}` +
+        `  ${chalk.gray(tagA)} vs ${chalk.gray(tagB)}\n`,
+    );
+    console.log(createCompareTable(auditA, auditB, {
+      colA: tagA,
+      colB: tagB,
+    }));
+    console.log();
+    return;
+  }
+
+  // ── --compare ────────────────────────────────────────────────────────────────
   if (options.compare) {
+    // If a label is given and both desktop + mobile runs exist → device comparison
+    if (options.label && !options.device) {
+      const devices = getDistinctDevicesForLabel(project.id, options.label);
+      if (devices.includes('desktop') && devices.includes('mobile')) {
+        const { last: desktop } = getFirstAndLastAudits(project.id, {
+          label: options.label, device: 'desktop',
+        });
+        const { last: mobile } = getFirstAndLastAudits(project.id, {
+          label: options.label, device: 'mobile',
+        });
+
+        if (desktop && mobile) {
+          console.log(
+            `\n${chalk.bold('Desktop vs Mobile')} — ${chalk.cyan(config.project)}` +
+              `  label: ${chalk.gray(options.label)}\n`,
+          );
+          console.log(createCompareTable(desktop, mobile, {
+            colA: '🖥  Desktop',
+            colB: '📱 Mobile',
+          }));
+          console.log();
+          return;
+        }
+      }
+    }
+
+    // Default: first vs latest
     const { first, last } = getFirstAndLastAudits(project.id, {
       label: options.label,
       device: options.device,
@@ -54,13 +116,11 @@ export async function reportCommand(options) {
     }
 
     if (first.id === last.id) {
-      console.log(
-        chalk.yellow('\nOnly one audit matches — showing it compared to itself.\n'),
-      );
+      console.log(chalk.yellow('\nOnly one audit matches — showing it compared to itself.\n'));
     }
 
     console.log(
-      `\n${chalk.bold('Comparison')} — ${chalk.cyan(config.project)}` +
+      `\n${chalk.bold('First vs Latest')} — ${chalk.cyan(config.project)}` +
         (options.label ? `  label: ${chalk.gray(options.label)}` : '') +
         '\n',
     );
@@ -70,6 +130,13 @@ export async function reportCommand(options) {
   }
 
   // ── Fetch audits ─────────────────────────────────────────────────────────────
+  const filters = {
+    last: parseInt(options.last ?? '10', 10),
+    label: options.label,
+    device: options.device,
+    tag: options.tag,
+  };
+
   const audits = getAudits(project.id, filters);
 
   if (audits.length === 0) {
@@ -78,19 +145,38 @@ export async function reportCommand(options) {
     return;
   }
 
-  // ── JSON output ───────────────────────────────────────────────────────────────
+  // ── JSON / CSV passthrough ────────────────────────────────────────────────────
   if (options.json) {
     process.stdout.write(JSON.stringify(audits, null, 2) + '\n');
     return;
   }
-
-  // ── CSV output ────────────────────────────────────────────────────────────────
   if (options.csv) {
     process.stdout.write(toCSV(audits) + '\n');
     return;
   }
 
-  // ── Default: ASCII table ──────────────────────────────────────────────────────
+  // ── Default table — auto-group by device when label has both ──────────────────
+  if (options.label && !options.device) {
+    const devices = getDistinctDevicesForLabel(project.id, options.label);
+    if (devices.length > 1) {
+      for (const device of devices) {
+        const rows = audits.filter((a) => a.device === device);
+        if (rows.length === 0) continue;
+        const icon = device === 'mobile' ? '📱' : '🖥 ';
+        console.log(
+          `\n${chalk.bold('Audit history')} — ${chalk.cyan(config.project)}` +
+            `  label: ${chalk.gray(options.label)}` +
+            `  ${icon} ${chalk.bold(device)}` +
+            `  ${chalk.gray(`(${rows.length} run${rows.length > 1 ? 's' : ''})`)}\n`,
+        );
+        console.log(createAuditTable(rows));
+      }
+      console.log();
+      return;
+    }
+  }
+
+  // Single-device or unfiltered: plain table
   const heading =
     `\n${chalk.bold('Audit history')} — ${chalk.cyan(config.project)}` +
     (options.label ? `  label: ${chalk.gray(options.label)}` : '') +
